@@ -29,13 +29,13 @@ export default function AppDetailPage({
   return (
     <OmicronBackdrop>
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-6">
-        <Card className="flex flex-1 flex-col gap-0 rounded-3xl border-white/60 bg-white/80 py-0 shadow-[0_30px_80px_rgba(15,23,42,0.12)] backdrop-blur">
+        <Card className="omicron-surface-xl flex flex-1 flex-col gap-0 rounded-3xl py-0">
           <CardContent className="flex flex-1 flex-col gap-10 p-6">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-[#8e8e8e]">
               <Button
                 asChild
                 variant="link"
-                className="h-auto px-0 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400 hover:text-slate-900"
+                className="h-auto px-0 text-xs font-semibold uppercase tracking-[0.3em] text-[#8e8e8e] hover:text-[#1d1d1f]"
               >
                 <Link href="/apps">Apps</Link>
               </Button>
@@ -46,7 +46,7 @@ export default function AppDetailPage({
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center gap-4">
                 <span
-                  className="flex h-14 w-14 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm"
+                  className="flex h-14 w-14 items-center justify-center rounded-full border border-[#d2d2d2] bg-white shadow-sm"
                   style={{ backgroundColor: app.logoBg }}
                 >
                   <Image
@@ -61,12 +61,12 @@ export default function AppDetailPage({
                   <h1 className="text-3xl font-semibold sm:text-4xl font-[var(--font-display)]">
                     {app.name}
                   </h1>
-                  <p className="mt-2 text-sm text-slate-500">
+                  <p className="mt-2 text-sm text-[#7a7a7a]">
                     {app.description}
                   </p>
                 </div>
               </div>
-              <Button className="h-10 rounded-full px-6 text-sm font-semibold">
+              <Button className="omicron-cta h-10 rounded-full px-6 text-sm font-semibold">
                 Connect
               </Button>
             </div>
@@ -76,41 +76,41 @@ export default function AppDetailPage({
                 <Card
                   key={`${app.slug}-${example.title}-${index}`}
                   className={cn(
-                    "gap-0 rounded-3xl border-slate-200/70 bg-gradient-to-br py-0 shadow-[0_20px_60px_rgba(15,23,42,0.12)]",
+                    "gap-0 rounded-3xl border-[#d8d8d8] bg-gradient-to-br py-0 shadow-[0_20px_60px_rgba(17,17,17,0.12)]",
                     example.surface
                   )}
                 >
                   <CardHeader className="pb-2">
-                    <CardDescription className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400">
+                    <CardDescription className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#8e8e8e]">
                       Example {index + 1}
                     </CardDescription>
-                    <CardTitle className="text-base text-slate-900">
+                    <CardTitle className="text-base text-[#1d1d1f]">
                       {example.title}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-0 text-sm text-slate-600">
+                  <CardContent className="pt-0 text-sm text-[#6e6e6e]">
                     {example.body}
                   </CardContent>
                 </Card>
               ))}
             </div>
 
-            <Card className="max-w-3xl gap-0 rounded-2xl border-slate-200/70 py-0 shadow-none">
-              <CardContent className="border-t border-slate-200/70 pt-6">
+            <Card className="max-w-3xl gap-0 rounded-2xl border-[#d8d8d8] py-0 shadow-none">
+              <CardContent className="border-t border-[#d8d8d8] pt-6">
                 <h2 className="text-lg font-semibold">Information</h2>
-                <p className="mt-3 text-sm text-slate-600">{app.longDescription}</p>
-                <div className="mt-6 grid gap-3 text-sm text-slate-500">
-                  <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
+                <p className="mt-3 text-sm text-[#6e6e6e]">{app.longDescription}</p>
+                <div className="mt-6 grid gap-3 text-sm text-[#7a7a7a]">
+                  <div className="flex items-center justify-between border-b border-[#d8d8d8] pb-2">
                     <span>Data access</span>
-                    <span className="text-slate-700">Read & write</span>
+                    <span className="text-[#3a3a3a]">Read & write</span>
                   </div>
-                  <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
+                  <div className="flex items-center justify-between border-b border-[#d8d8d8] pb-2">
                     <span>Setup time</span>
-                    <span className="text-slate-700">2-3 minutes</span>
+                    <span className="text-[#3a3a3a]">2-3 minutes</span>
                   </div>
-                  <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
+                  <div className="flex items-center justify-between border-b border-[#d8d8d8] pb-2">
                     <span>Permissions</span>
-                    <span className="text-slate-700">Admin approved</span>
+                    <span className="text-[#3a3a3a]">Admin approved</span>
                   </div>
                 </div>
               </CardContent>

@@ -15,7 +15,6 @@ import {
 } from "react";
 import {
   deleteConversation,
-  isChatApiConfigured,
   listSessions,
   type ChatConversation,
 } from "@/lib/api/chat";
@@ -90,7 +89,6 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
   >([]);
 
   const isMountedRef = useRef(true);
-  const isMock = useMemo(() => !isChatApiConfigured(), []);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -277,24 +275,24 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
   return (
     <ChatShellContext.Provider value={contextValue}>
       <OmicronBackdrop>
-        <div className="mx-auto h-screen max-w-7xl px-4 py-6">
-          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-white/60 bg-white/80 shadow-[0_30px_80px_rgba(15,23,42,0.12)] backdrop-blur lg:flex-row">
-          <Card
-            className={cn(
-              "overflow-hidden border-0 bg-transparent py-0 shadow-none transition-all duration-300",
-              isSidebarCollapsed
-                ? "pointer-events-none max-h-0 w-full opacity-0 lg:max-h-none lg:w-0"
-                : "max-h-full w-full opacity-100 lg:w-80"
-            )}
-          >
-            <CardContent className="flex h-full flex-col gap-6 p-6">
-              <div className="flex items-start justify-between gap-4">
+        <div className="h-screen w-full px-0 py-0">
+          <div className="flex h-full min-h-0 flex-col lg:flex-row">
+            <Card
+              className={cn(
+                "overflow-hidden border-0 bg-transparent py-0 shadow-none transition-all duration-300",
+                isSidebarCollapsed
+                  ? "pointer-events-none max-h-0 w-full opacity-0 lg:max-h-none lg:w-0"
+                  : "max-h-full w-full opacity-100 lg:w-80"
+              )}
+            >
+              <CardContent className="flex h-full flex-col gap-5 p-6">
+                <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8b8b8f]">
                     Omicron
                   </p>
-                  <h2 className="mt-2 text-2xl font-semibold text-slate-900 font-[var(--font-display)]">
-                    Chat
+                  <h2 className="mt-1 text-[1.95rem] leading-none font-semibold text-[#1d1d1f] font-[var(--font-display)]">
+                    Messages
                   </h2>
                 </div>
                 <div className="flex items-start gap-2">
@@ -303,30 +301,20 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
                     variant="ghost"
                     size="icon-sm"
                     onClick={() => setIsSidebarCollapsed(true)}
-                    className="rounded-full text-slate-500 hover:text-slate-800"
+                    className="rounded-full text-[#7a7a7a] hover:text-[#2d2d30]"
                     aria-label="Collapse sidebar"
                     title="Collapse sidebar"
                   >
                     <PanelLeftClose className="h-4 w-4" />
                   </Button>
                   <div className="flex flex-col items-end gap-2">
-                    <Badge
-                      variant="outline"
-                      className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${
-                        isMock
-                          ? "border-amber-200 bg-amber-50 text-amber-700"
-                          : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      }`}
-                    >
-                      {isMock ? "Mock" : "Live"}
-                    </Badge>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       onClick={handleSignOut}
                       disabled={isSigningOut}
-                      className="h-auto px-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 hover:text-slate-800"
+                      className="h-auto px-2 text-xs font-medium text-[#7a7a7a] hover:text-[#2d2d30]"
                     >
                       {isSigningOut ? "Signing out" : "Sign out"}
                     </Button>
@@ -342,11 +330,11 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
                 </Alert>
               ) : null}
 
-              <Card className="gap-0 rounded-2xl border-slate-200/70 bg-white/90 py-0 shadow-sm">
+              <Card className="gap-0 rounded-2xl border-[#d8d8d8] bg-white/90 py-0 shadow-[0_10px_24px_rgba(17,17,17,0.05)]">
                 <CardContent className="space-y-2 p-3">
                   <Label
                     htmlFor="chat-shell-search"
-                    className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400"
+                    className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e8e8e]"
                   >
                     Search chats
                   </Label>
@@ -356,69 +344,73 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
                     placeholder="Find a thread"
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
-                    className="h-8 border-0 bg-transparent px-0 text-sm text-slate-700 shadow-none focus-visible:ring-0 placeholder:text-slate-400"
+                    className="h-8 border-0 bg-transparent px-0 text-sm text-[#3a3a3a] shadow-none focus-visible:ring-0 placeholder:text-[#8e8e8e]"
                   />
                 </CardContent>
               </Card>
 
-              <Card className="gap-0 rounded-2xl border-slate-200/70 bg-white/90 py-0 shadow-sm">
-                <CardContent className="space-y-2 p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                    Navigation
-                  </p>
-                  <Button
-                    asChild
-                    variant="ghost"
-                    className="h-auto w-full justify-between rounded-xl px-2 py-2 text-sm font-semibold text-slate-700 hover:border-slate-200 hover:bg-white"
-                  >
-                    <Link href="/apps">
-                      <span className="inline-flex items-center gap-2">
-                        <Grid2X2 className="h-4 w-4 text-slate-500" />
-                        Apps
-                      </span>
-                      <span className="text-xs text-slate-400">View</span>
-                    </Link>
-                  </Button>
+              <Card className="gap-0 rounded-2xl border-[#d8d8d8] bg-white/90 py-0 shadow-[0_10px_24px_rgba(17,17,17,0.05)]">
+                <CardContent className="space-y-3 p-3">
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e8e8e]">
+                      Navigation
+                    </p>
+                    <Button
+                      asChild
+                      variant="ghost"
+                      className="h-auto w-full justify-between rounded-xl px-2 py-2 text-sm font-semibold text-[#3a3a3a] hover:border-[#d2d2d2] hover:bg-white"
+                    >
+                      <Link href="/apps">
+                        <span className="inline-flex items-center gap-2">
+                          <Grid2X2 className="h-4 w-4 text-[#7a7a7a]" />
+                          Apps
+                        </span>
+                        <span className="text-xs text-[#8e8e8e]">View</span>
+                      </Link>
+                    </Button>
+                  </div>
+
+                  <div className="h-px bg-[#ececec]" />
+
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e8e8e]">
+                      Connected apps
+                    </p>
+                    {connectedApps.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {connectedApps.map((app) => (
+                          <Badge
+                            key={app.name}
+                            variant="outline"
+                            className="inline-flex items-center gap-2 rounded-full border-[#d2d2d2] bg-white px-3 py-1 text-xs font-semibold text-[#6e6e6e]"
+                          >
+                            <Image
+                              src={app.logo}
+                              alt={`${app.name} logo`}
+                              width={14}
+                              height={14}
+                              className="h-3.5 w-3.5"
+                            />
+                            {app.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-[#8e8e8e]">No apps connected yet.</p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
-              {connectedApps.length > 0 ? (
-                <Card className="gap-0 rounded-2xl border-slate-200/70 bg-white/90 py-0 shadow-sm">
-                  <CardContent className="space-y-2 p-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                      Connected apps
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {connectedApps.map((app) => (
-                        <Badge
-                          key={app.name}
-                          variant="outline"
-                          className="inline-flex items-center gap-2 rounded-full border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600"
-                        >
-                          <Image
-                            src={app.logo}
-                            alt={`${app.name} logo`}
-                            width={14}
-                            height={14}
-                            className="h-3.5 w-3.5"
-                          />
-                          {app.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : null}
-
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8e8e8e]">
                   Conversations
                 </p>
                 <Button
                   asChild
-                  variant="outline"
+                  variant="default"
                   size="xs"
-                  className="rounded-full border-slate-200 bg-white/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600 hover:border-emerald-200 hover:text-emerald-700"
+                  className="omicron-chat-accent-btn rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em]"
                 >
                   <Link href="/chat">New</Link>
                 </Button>
@@ -437,13 +429,13 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
                   ? Array.from({ length: 4 }).map((_, index) => (
                       <Skeleton
                         key={`skeleton-${index}`}
-                        className="h-16 rounded-2xl border border-white/60 bg-white/60"
+                        className="h-16 rounded-2xl border border-[#d8d8d8] bg-white/60"
                       />
                     ))
                   : visibleConversations.length === 0
                     ? (
-                        <Card className="gap-0 rounded-2xl border-slate-200/70 bg-white/80 py-0 shadow-none">
-                          <CardContent className="px-4 py-3 text-xs text-slate-500">
+                        <Card className="gap-0 rounded-2xl border-[#d8d8d8] bg-white/92 py-0 shadow-none">
+                          <CardContent className="px-4 py-3 text-xs text-[#7a7a7a]">
                             {normalizedSearchQuery
                               ? "No chats match your search."
                               : "No conversations yet."}
@@ -459,8 +451,8 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
                           key={conversation.id}
                           className={`group gap-0 rounded-2xl border py-0 text-sm shadow-none transition ${
                             isActive
-                              ? "border-emerald-200 bg-emerald-50"
-                              : "border-transparent bg-white/80 hover:border-slate-200"
+                              ? "border-[#c8dcff] bg-[#edf5ff]"
+                              : "border-transparent bg-white/92 hover:border-[#d2d2d2]"
                           }`}
                         >
                           <CardContent className="p-3">
@@ -477,13 +469,13 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
                                   }
                                   className="min-w-0"
                                 >
-                                  <span className="block truncate font-semibold text-slate-900">
+                                  <span className="block truncate font-semibold text-[#1d1d1f]">
                                     {conversation.title}
                                   </span>
                                 </Link>
                               </Button>
                               <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-400">
+                                <span className="text-xs text-[#8e8e8e]">
                                   {formatDate(conversation.updatedAt)}
                                 </span>
                                 <Button
@@ -494,7 +486,7 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
                                     setConfirmingConversationId(conversation.id)
                                   }
                                   disabled={isDeleting}
-                                  className="rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                  className="rounded-full text-[#8e8e8e] hover:bg-rose-50 hover:text-rose-600"
                                   aria-label="Delete conversation"
                                   title="Delete conversation"
                                 >
@@ -502,65 +494,46 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
                                 </Button>
                               </div>
                             </div>
-
-                            <Button
-                              asChild
-                              variant="ghost"
-                              className="mt-1 h-auto w-full justify-start p-0 text-left hover:bg-transparent"
-                            >
-                              <Link
-                                href={`/chat/${conversation.id}`}
-                                onClick={() =>
-                                  handleConversationOpen(conversation.id)
-                                }
-                                className="block w-full min-w-0"
-                              >
-                                <span className="block truncate text-xs text-slate-500">
-                                  {conversation.preview}
-                                </span>
-                              </Link>
-                            </Button>
                           </CardContent>
                         </Card>
                       );
                     })}
               </div>
 
-              <Card className="gap-0 rounded-2xl border-slate-200/70 bg-white/80 py-0 shadow-none">
-                <CardContent className="px-4 py-3 text-xs text-slate-600">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+              <Card className="gap-0 rounded-2xl border-[#d8d8d8] bg-white/92 py-0 shadow-none">
+                <CardContent className="px-4 py-3 text-xs text-[#6e6e6e]">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e8e8e]">
                     Signed in
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-slate-900">
+                  <p className="mt-2 text-sm font-semibold text-[#1d1d1f]">
                     {session?.user?.email ?? "Unknown"}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">Workspace: Omicron</p>
                 </CardContent>
               </Card>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <section
-            className={cn(
-              "relative flex min-h-0 flex-1 flex-col bg-transparent p-6",
-              isSidebarCollapsed ? "pt-14" : ""
-            )}
-          >
-            {isSidebarCollapsed ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                onClick={() => setIsSidebarCollapsed(false)}
-                className="absolute left-4 top-4 z-10 rounded-full border-slate-200 bg-white/90 text-slate-600 shadow-sm hover:text-slate-900"
-                aria-label="Expand sidebar"
-                title="Expand sidebar"
-              >
-                <PanelLeftOpen className="h-4 w-4" />
-              </Button>
-            ) : null}
-            {children}
-          </section>
+            <section
+              className={cn(
+                "relative flex min-h-0 flex-1 flex-col bg-transparent p-6",
+                isSidebarCollapsed ? "pt-14" : ""
+              )}
+            >
+              {isSidebarCollapsed ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => setIsSidebarCollapsed(false)}
+                  className="absolute left-4 top-4 z-10 rounded-full border-[#d2d2d2] bg-white/90 text-[#6e6e6e] shadow-sm hover:text-[#1d1d1f]"
+                  aria-label="Expand sidebar"
+                  title="Expand sidebar"
+                >
+                  <PanelLeftOpen className="h-4 w-4" />
+                </Button>
+              ) : null}
+              {children}
+            </section>
           </div>
         </div>
 
@@ -578,7 +551,7 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
               <DialogDescription>
                 This action cannot be undone.
                 {confirmingConversation ? (
-                  <span className="mt-2 block font-medium text-slate-700">
+                  <span className="mt-2 block font-medium text-[#3a3a3a]">
                     {confirmingConversation.title}
                   </span>
                 ) : null}

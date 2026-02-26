@@ -7,6 +7,8 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+.npm/
+.pnpm-store/
 
 # Build and framework output
 /.next
@@ -28,6 +30,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+*.pid
+*.seed
 
 # Environment files
 .env*
@@ -40,6 +44,18 @@ lerna-debug.log*
 # TypeScript and generated metadata
 *.tsbuildinfo
 next-env.d.ts
+
+# Tooling caches
+.eslintcache
+.stylelintcache
+.prettier-cache
+
+# Python / virtual env (for local backend scripts)
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
 
 # Certificates and local secrets
 *.pem
@@ -65,3 +81,7 @@ tmp/
 temp/
 *.tmp
 todos/
+*.orig
+
+# Legacy hooks
+.githooks/

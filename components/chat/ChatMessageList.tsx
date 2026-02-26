@@ -2,9 +2,34 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 import { Button } from "@/components/ui/button";
 import type { ChatMessage } from "@/lib/api/chat";
 import { cn } from "@/lib/utils";
+
+const HTML_CODE_FENCE_PATTERN = /^\s*```(?:html|htm|xml)?\s*([\s\S]*?)\s*```\s*$/i;
+const ESCAPED_HTML_TAG_PATTERN = /&lt;\s*\/?\s*[a-zA-Z][\s\S]*?&gt;/;
+
+const decodeBasicHtmlEntities = (value: string) =>
+  value
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&amp;", "&");
+
+const normalizeRenderableContent = (value: string) => {
+  const trimmed = value.trim();
+  const fencedMatch = trimmed.match(HTML_CODE_FENCE_PATTERN);
+  const candidate = fencedMatch ? fencedMatch[1] : value;
+
+  if (!ESCAPED_HTML_TAG_PATTERN.test(candidate)) {
+    return candidate;
+  }
+
+  return decodeBasicHtmlEntities(candidate);
+};
 
 export default function ChatMessageList({
   messages,
@@ -19,27 +44,32 @@ export default function ChatMessageList({
 }) {
   if (messages.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200/80 bg-white/40 p-10 text-center text-sm text-slate-500">
+      <div className="p-10 text-center text-sm text-[#7a7a7a]">
         No messages yet. Start with a clear prompt to begin.
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="w-full space-y-6">
       {messages.map((message) => {
         const isUser = message.role === "user";
         const isThinking = thinkingMessageId === message.id;
         const hasThinkingAvailable = Boolean(thinkingAvailableByMessageId?.[message.id]);
         const showThinking = !isUser && (isThinking || hasThinkingAvailable);
+        const renderableContent = normalizeRenderableContent(
+          message.content || "Thinking..."
+        );
 
         if (isUser) {
           return (
             <article key={message.id} className="flex justify-end">
               <div className="max-w-[85%] sm:max-w-[70%]">
-                <div className="inline-block rounded-[999px] bg-slate-900 px-5 py-3 text-left text-sm leading-6 text-white">
+                <div className="inline-block rounded-[1.35rem] bg-gradient-to-b from-[#232326] to-[#151517] px-5 py-3 text-left text-sm leading-6 text-white shadow-[0_4px_12px_rgba(17,17,17,0.12)]">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                    skipHtml={false}
                     components={{
                       p: ({ children }) => (
                         <p className="mb-2 last:mb-0">{children}</p>
@@ -81,7 +111,7 @@ export default function ChatMessageList({
                       ),
                     }}
                   >
-                    {message.content || "Thinking..."}
+                    {renderableContent}
                   </ReactMarkdown>
                 </div>
               </div>
@@ -91,9 +121,11 @@ export default function ChatMessageList({
 
         return (
           <article key={message.id} className="space-y-2">
-            <div className="max-w-3xl text-sm leading-7 text-slate-700">
+            <div className="w-full px-1 py-1 text-[15px] leading-7 text-[#303036]">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                skipHtml={false}
                 components={{
                   p: ({ children }) => (
                     <p className="mb-2 last:mb-0">{children}</p>
@@ -101,7 +133,7 @@ export default function ChatMessageList({
                   a: ({ children, ...props }) => (
                     <a
                       {...props}
-                      className="text-emerald-700 underline underline-offset-4"
+                      className="text-[#0b5cb6] underline underline-offset-4 hover:text-[#084f9b]"
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -109,12 +141,12 @@ export default function ChatMessageList({
                     </a>
                   ),
                   code: ({ children }) => (
-                    <code className="rounded bg-slate-900/10 px-1 py-0.5 text-[0.8em] text-slate-700">
+                    <code className="rounded bg-[#f2f5f9] px-1 py-0.5 text-[0.8em] text-[#303036]">
                       {children}
                     </code>
                   ),
                   pre: ({ children }) => (
-                    <pre className="mt-2 overflow-x-auto rounded-lg bg-slate-900/10 p-3 text-xs">
+                    <pre className="mt-2 overflow-x-auto rounded-lg border border-[#dde3ec] bg-[#f5f8fc] p-3 text-xs text-[#303036]">
                       {children}
                     </pre>
                   ),
@@ -129,26 +161,26 @@ export default function ChatMessageList({
                     </ol>
                   ),
                   blockquote: ({ children }) => (
-                    <blockquote className="border-l-2 border-slate-300 pl-3 italic">
+                    <blockquote className="border-l-2 border-[#d2d2d2] pl-3 italic">
                       {children}
                     </blockquote>
                   ),
                 }}
               >
-                {message.content || "Thinking..."}
+                {renderableContent}
               </ReactMarkdown>
             </div>
             {showThinking ? (
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="xs"
                 onClick={() => onReasoningClick?.(message.id)}
                 className={cn(
-                  "rounded-full px-2 text-[10px] font-semibold uppercase tracking-[0.2em]",
+                  "h-auto rounded-full px-2 text-[10px] font-semibold uppercase tracking-[0.2em]",
                   isThinking
-                    ? "border-amber-200 bg-amber-50 text-amber-700 animate-pulse"
-                    : "border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-700"
+                    ? "bg-transparent text-[#0b5cb6] animate-pulse"
+                    : "bg-transparent text-[#7a7a7a] hover:text-[#0b5cb6]"
                 )}
               >
                 Thinking

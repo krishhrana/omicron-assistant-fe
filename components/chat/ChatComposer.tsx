@@ -13,6 +13,7 @@ type ChatComposerProps = {
   placeholder?: string;
   value?: string;
   onChange?: (value: string) => void;
+  panelClassName?: string;
 };
 
 export default function ChatComposer({
@@ -22,6 +23,7 @@ export default function ChatComposer({
   placeholder = "Message the assistant...",
   value,
   onChange,
+  panelClassName,
 }: ChatComposerProps) {
   const [internalValue, setInternalValue] = useState("");
   const message = value ?? internalValue;
@@ -49,7 +51,12 @@ export default function ChatComposer({
       }}
       className="w-full"
     >
-      <div className="relative rounded-3xl border border-slate-200/80 bg-white/95 p-3 shadow-sm">
+      <div
+        className={cn(
+          "relative rounded-[1.35rem] border border-[#d7d9dd]/80 bg-white/88 p-3 shadow-[0_24px_56px_rgba(15,23,42,0.2)] backdrop-blur",
+          panelClassName
+        )}
+      >
         <Textarea
           id="chat-composer"
           rows={2}
@@ -65,7 +72,7 @@ export default function ChatComposer({
           placeholder={placeholder}
           aria-label="Message input"
           className={cn(
-            "min-h-[96px] resize-none border-0 bg-transparent px-1 pb-10 pr-12 pt-1 shadow-none focus-visible:ring-0",
+            "min-h-[104px] resize-none border-0 bg-transparent px-1 pb-10 pr-12 pt-1 text-[15px] leading-6 text-[#1d1d1f] shadow-none placeholder:text-[#9a9aa0] focus-visible:ring-0",
             isDisabled && "cursor-not-allowed opacity-70"
           )}
         />
@@ -73,7 +80,7 @@ export default function ChatComposer({
           type="submit"
           size="icon"
           disabled={isSubmitDisabled}
-          className="absolute bottom-3 right-3 h-9 w-9 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+          className="omicron-chat-send absolute bottom-3 right-3 h-9 w-9 rounded-full shadow-[0_8px_20px_rgba(0,113,227,0.36)]"
           aria-label={statusLabel}
           title={statusLabel}
         >
@@ -83,7 +90,7 @@ export default function ChatComposer({
             <ArrowUp className="h-4 w-4" />
           )}
         </Button>
-        <p className="pointer-events-none absolute bottom-3 left-4 text-[11px] text-slate-400">
+        <p className="pointer-events-none absolute bottom-3 left-4 text-[11px] text-[#8f8f95]">
           Enter to send, Shift + Enter for a new line
         </p>
       </div>

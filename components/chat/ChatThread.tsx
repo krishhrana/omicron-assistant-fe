@@ -25,6 +25,7 @@ import { useAuth } from "@/components/auth/AuthenticatedApp";
 import { useChatShell } from "@/components/chat/ChatShell";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 const LOAD_HISTORY_KEY = "omicron.loadHistoryFor";
 const PENDING_CHAT_KEY = "omicron.pendingChat";
@@ -119,6 +120,8 @@ export default function ChatThread({
   const [sendError, setSendError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [newChatDraft, setNewChatDraft] = useState("");
+  const [showHeaderSeparator, setShowHeaderSeparator] = useState(false);
   const [thinkingTimelineByMessageId, setThinkingTimelineByMessageId] = useState<
     Record<string, ThinkingTimelineEntry[]>
   >({});
@@ -126,6 +129,7 @@ export default function ChatThread({
   const streamControllerRef = useRef<AbortController | null>(null);
   const hasAutoStartedRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const isProgrammaticScrollRef = useRef(false);
   const conversationsRef = useRef<ChatConversation[]>(conversations);
   const messagesRef = useRef<ChatMessage[]>(messages);
   const conversationRef = useRef<ChatConversation | null>(conversation);
@@ -151,11 +155,6 @@ export default function ChatThread({
   useEffect(() => {
     thinkingTimelineRef.current = thinkingTimelineByMessageId;
   }, [thinkingTimelineByMessageId]);
-
-  const lastUpdatedLabel = useMemo(
-    () => formatUpdatedAt(conversation?.updatedAt),
-    [conversation?.updatedAt]
-  );
 
   const selectedReasoningMessage = useMemo(
     () => messages.find((message) => message.id === selectedReasoningId) ?? null,
@@ -439,11 +438,32 @@ export default function ChatThread({
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    isProgrammaticScrollRef.current = true;
     container.scrollTo({
       top: container.scrollHeight,
       behavior: "smooth",
     });
+
+    const timeoutId = window.setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      isProgrammaticScrollRef.current = false;
+    };
   }, [messages.length]);
+
+  useEffect(() => {
+    setShowHeaderSeparator(false);
+  }, [conversationId]);
+
+  const handleThreadScroll = useCallback(() => {
+    if (isProgrammaticScrollRef.current) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    setShowHeaderSeparator(container.scrollTop > 1);
+  }, []);
 
   const startStreaming = useCallback(async (content: string) => {
     if (isStreaming) return;
@@ -830,11 +850,17 @@ export default function ChatThread({
 
   if (isLoading && messages.length === 0) {
     return (
-      <Card className="flex h-full items-center justify-center gap-0 py-0">
-        <CardContent className="p-6 text-sm text-slate-500">
-          Loading conversation...
-        </CardContent>
-      </Card>
+      <div className="flex h-full w-full flex-1 flex-col items-center justify-center">
+        <Card className="gap-0 border-0 bg-transparent py-0 shadow-none">
+          <CardContent className="inline-flex items-center gap-3 rounded-full border border-[#d8d8d8] bg-white/72 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6e6e6e]">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[#0b5cb6]" />
+            Loading conversation
+          </CardContent>
+        </Card>
+        <p className="mt-3 text-xs text-[#8e8e8e]">
+          Syncing messages and context...
+        </p>
+      </div>
     );
   }
 
@@ -848,17 +874,8 @@ export default function ChatThread({
 
   if (isFreshNewChat) {
     return (
-      <div className="mx-auto flex h-full w-full max-w-4xl flex-1 flex-col items-center justify-center gap-6">
-        <div className="text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            New Chat
-          </p>
-          <h2 className="mt-3 text-3xl font-semibold text-slate-900 font-[var(--font-display)]">
-            What can I help you with?
-          </h2>
-        </div>
-
-        <div className="w-full space-y-3">
+      <div className="flex h-full w-full flex-1 flex-col items-center justify-center">
+        <div className="w-full max-w-[44rem] space-y-3">
           {sendError ? (
             <Alert variant="destructive">
               <AlertDescription>{sendError}</AlertDescription>
@@ -866,14 +883,16 @@ export default function ChatThread({
           ) : null}
 
           {!isChatApiConfigured() ? (
-            <Alert>
+            <Alert className="omicron-notice">
               <AlertDescription>
-                Using mock data until the chat API base URL is configured.
+                Chat backend is not configured yet. Showing sample responses.
               </AlertDescription>
             </Alert>
           ) : null}
 
           <ChatComposer
+            value={newChatDraft}
+            onChange={setNewChatDraft}
             onSend={startStreaming}
             isSending={isStreaming}
             isDisabled={isLoading}
@@ -885,216 +904,237 @@ export default function ChatThread({
   }
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-6">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 pb-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            Conversation
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900 font-[var(--font-display)]">
-            {conversation?.title ?? "Conversation"}
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">Last active {lastUpdatedLabel}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <Badge>SSE streaming</Badge>
-          {!isChatApiConfigured() ? <Badge variant="secondary">Mock data</Badge> : null}
-        </div>
-      </header>
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col">
+      <div className="-mr-6 -mt-6 space-y-4 pr-6 pt-6">
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-[2rem] leading-tight font-semibold text-[#1d1d1f] font-[var(--font-display)]">
+              {conversation?.title ?? "Conversation"}
+            </h2>
+          </div>
+          {!isChatApiConfigured() ? (
+            <Badge
+              variant="outline"
+              className="border-[#d2d2d2] bg-[#f5f5f2] text-[#6e6e6e]"
+            >
+              Sample mode
+            </Badge>
+          ) : null}
+        </header>
+        <Separator
+          className={cn(
+            "transition-opacity duration-200",
+            showHeaderSeparator ? "opacity-100" : "opacity-0"
+          )}
+        />
+      </div>
 
-      {sendError ? (
-        <Alert variant="destructive">
-          <AlertDescription>{sendError}</AlertDescription>
-        </Alert>
-      ) : null}
+      <div className="-mb-3 -mr-6 min-h-0 flex-1 pr-6 pt-4">
+        <div className="flex h-full min-h-0 flex-col gap-6 lg:flex-row">
+          <div className="relative min-h-0 min-w-0 flex-1">
+            <div
+              ref={scrollContainerRef}
+              onScroll={handleThreadScroll}
+              className="h-full overflow-y-auto"
+            >
+              <div className="mx-auto w-full max-w-[44rem] space-y-6 pb-24 pt-2">
+                {sendError ? (
+                  <Alert variant="destructive">
+                    <AlertDescription>{sendError}</AlertDescription>
+                  </Alert>
+                ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
-          <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto pr-2">
-            <ChatMessageList
-              messages={messages}
-              thinkingMessageId={thinkingMessageId}
-              thinkingAvailableByMessageId={thinkingAvailableByMessageId}
-              onReasoningClick={(messageId) => {
-                setSelectedReasoningId(messageId);
-                setIsReasoningOpen(true);
-              }}
-            />
+                <ChatMessageList
+                  messages={messages}
+                  thinkingMessageId={thinkingMessageId}
+                  thinkingAvailableByMessageId={thinkingAvailableByMessageId}
+                  onReasoningClick={(messageId) => {
+                    setSelectedReasoningId(messageId);
+                    setIsReasoningOpen(true);
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-[#f6f6f3]">
+              <div className="pointer-events-auto mx-auto w-full max-w-[44rem] pb-3">
+                <ChatComposer
+                  onSend={startStreaming}
+                  isSending={isStreaming}
+                  isDisabled={isLoading}
+                  panelClassName="bg-[#f6f6f3] backdrop-blur-none"
+                />
+              </div>
+            </div>
           </div>
 
-          <ChatComposer
-            onSend={startStreaming}
-            isSending={isStreaming}
-            isDisabled={isLoading}
-          />
-        </div>
-
-        <aside
-          className={cn(
-            "w-full transition lg:w-80",
-            isReasoningOpen ? "block" : "hidden"
-          )}
-        >
-          <Card className="h-full rounded-3xl border-slate-200/80 bg-white/90 shadow-sm backdrop-blur">
-            <CardHeader className="gap-3 border-b border-slate-200/70 pb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-                Reasoning
-              </p>
-              <div className="flex items-center justify-between gap-4">
-                <CardTitle className="text-lg text-slate-900">Model thinking</CardTitle>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  onClick={() => setIsReasoningOpen(false)}
-                  className="rounded-full border-slate-200 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500"
-                >
-                  Close
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 overflow-y-auto text-sm text-slate-600">
-              {!selectedReasoningMessage ? (
-                <Card className="border-dashed bg-slate-50 py-3 shadow-none">
-                  <CardContent className="px-4 text-sm text-slate-500">
-                    Click the Thinking button on a message to inspect reasoning
-                    steps.
-                  </CardContent>
-                </Card>
-              ) : !selectedHasAnyInspection ? (
-                <Card className="bg-white py-3 shadow-none">
-                  <CardContent className="px-4 text-sm text-slate-500">
-                    No reasoning stream or agent updates captured for this message.
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-4">
-                  {selectedHasTimeline ? (
-                    <div className="space-y-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                        Updates (in order)
-                      </div>
+          <aside
+            className={cn(
+              "w-full overflow-hidden transition duration-300 lg:h-full lg:min-h-0 lg:w-[24rem]",
+              isReasoningOpen ? "block" : "hidden"
+            )}
+          >
+            <Card className="flex h-full min-h-0 flex-col gap-4 rounded-3xl border-0 bg-transparent py-0 shadow-none">
+              <CardHeader className="gap-3 pb-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8e8e8e]">
+                  Reasoning
+                </p>
+                <div className="flex items-center justify-between gap-4">
+                  <CardTitle className="text-lg text-[#1d1d1f]">Model thinking</CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => setIsReasoningOpen(false)}
+                    className="rounded-full border-[#d2d2d2] bg-white text-[10px] font-semibold uppercase tracking-[0.2em] text-[#7a7a7a] hover:border-[#c8dcff] hover:text-[#0b5cb6]"
+                  >
+                    Close
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto px-0 text-sm text-[#6e6e6e]">
+                {!selectedReasoningMessage ? (
+                  <Card className="bg-white/55 py-3 shadow-none">
+                    <CardContent className="px-4 text-sm text-[#7a7a7a]">
+                      Click the Thinking button on a message to inspect reasoning
+                      steps.
+                    </CardContent>
+                  </Card>
+                ) : !selectedHasAnyInspection ? (
+                  <Card className="bg-white/55 py-3 shadow-none">
+                    <CardContent className="px-4 text-sm text-[#7a7a7a]">
+                      No reasoning stream or agent updates captured for this message.
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-4">
+                    {selectedHasTimeline ? (
                       <div className="space-y-3">
-                        {selectedThinkingTimeline.map((entry) => {
-                          if (entry.kind === "agent_update") {
-                            const kindLabel =
-                              entry.updateKind === "switch"
-                                ? "agent switch"
-                                : entry.updateKind.replace(/_/g, " ");
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8e8e8e]">
+                          Updates (in order)
+                        </div>
+                        <div className="space-y-3">
+                          {selectedThinkingTimeline.map((entry) => {
+                            if (entry.kind === "agent_update") {
+                              const kindLabel =
+                                entry.updateKind === "switch"
+                                  ? "agent switch"
+                                  : entry.updateKind.replace(/_/g, " ");
+
+                              return (
+                                <Card
+                                  key={entry.id}
+                                  className="rounded-2xl border-0 bg-white/72 py-3 shadow-none"
+                                >
+                                  <CardContent className="px-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8e8e8e]">
+                                      <span className="flex flex-wrap items-center gap-2">
+                                        <Badge
+                                          variant="outline"
+                                          className="border-[#d2d2d2] bg-white text-[#6e6e6e]"
+                                        >
+                                          {kindLabel}
+                                        </Badge>
+                                      </span>
+                                      <span>{formatUpdatedAt(entry.createdAt)}</span>
+                                    </div>
+
+                                    <pre className="mt-3 whitespace-pre-wrap break-words rounded-lg bg-[#f5f8fc]/85 p-3 text-xs text-[#3a3a3a]">
+                                      {(entry.from ?? "").trim()
+                                        ? `${entry.from} -> ${entry.to}`
+                                        : entry.to}
+                                    </pre>
+                                  </CardContent>
+                                </Card>
+                              );
+                            }
 
                             return (
                               <Card
                                 key={entry.id}
-                                className="rounded-2xl border-slate-200/80 bg-white py-3 shadow-sm"
+                                className="rounded-2xl border-0 bg-white/72 py-3 shadow-none"
                               >
                                 <CardContent className="px-4">
-                                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8e8e8e]">
                                     <span className="flex flex-wrap items-center gap-2">
                                       <Badge
                                         variant="outline"
-                                        className="border-slate-200 bg-white text-slate-600"
+                                        className="border-[#d2d2d2] bg-white text-[#6e6e6e]"
                                       >
-                                        {kindLabel}
+                                        {entry.agentLabel}
                                       </Badge>
+                                      <span>reasoning</span>
                                     </span>
                                     <span>{formatUpdatedAt(entry.createdAt)}</span>
                                   </div>
 
-                                  <pre className="mt-3 whitespace-pre-wrap break-words rounded-lg bg-slate-900/5 p-3 text-xs text-slate-700">
-                                    {(entry.from ?? "").trim()
-                                      ? `${entry.from} -> ${entry.to}`
-                                      : entry.to}
-                                  </pre>
+                                  <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-[#6e6e6e]">
+                                    <li>
+                                      <ReactMarkdown
+                                        remarkPlugins={[remarkGfm]}
+                                        components={{
+                                          p: ({ children }) => <span>{children}</span>,
+                                        }}
+                                      >
+                                        {entry.text}
+                                      </ReactMarkdown>
+                                    </li>
+                                  </ul>
                                 </CardContent>
                               </Card>
                             );
-                          }
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
 
-                          return (
+                    {selectedShouldShowStructuredReasoning ? (
+                      <div className="space-y-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8e8e8e]">
+                          Reasoning summary
+                        </div>
+                        {Object.entries(selectedStructuredReasoningByAgent)
+                          .filter(([, bullets]) => bullets.length > 0)
+                          .sort(([a], [b]) => sortAgentLabels(a, b))
+                          .map(([agentLabel, bullets]) => (
                             <Card
-                              key={entry.id}
-                              className="rounded-2xl border-slate-200/80 bg-white py-3 shadow-sm"
+                              key={`structured-reasoning-${agentLabel}`}
+                              className="rounded-2xl border-0 bg-white/72 py-3 shadow-none"
                             >
                               <CardContent className="px-4">
-                                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                  <span className="flex flex-wrap items-center gap-2">
-                                    <Badge
-                                      variant="outline"
-                                      className="border-slate-200 bg-white text-slate-600"
-                                    >
-                                      {entry.agentLabel}
-                                    </Badge>
-                                    <span>reasoning</span>
-                                  </span>
-                                  <span>{formatUpdatedAt(entry.createdAt)}</span>
+                                <div className="flex items-center justify-between gap-2">
+                                  <Badge
+                                    variant="outline"
+                                    className="border-[#d2d2d2] bg-white text-[#6e6e6e]"
+                                  >
+                                    {agentLabel}
+                                  </Badge>
                                 </div>
-
-                                <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-slate-600">
-                                  <li>
-                                    <ReactMarkdown
-                                      remarkPlugins={[remarkGfm]}
-                                      components={{
-                                        p: ({ children }) => <span>{children}</span>,
-                                      }}
-                                    >
-                                      {entry.text}
-                                    </ReactMarkdown>
-                                  </li>
+                                <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-[#6e6e6e]">
+                                  {bullets.map((bullet, bulletIndex) => (
+                                    <li key={`structured-reasoning-${agentLabel}-${bulletIndex}`}>
+                                      <ReactMarkdown
+                                        remarkPlugins={[remarkGfm]}
+                                        components={{
+                                          p: ({ children }) => <span>{children}</span>,
+                                        }}
+                                      >
+                                        {bullet}
+                                      </ReactMarkdown>
+                                    </li>
+                                  ))}
                                 </ul>
                               </CardContent>
                             </Card>
-                          );
-                        })}
+                          ))}
                       </div>
-                    </div>
-                  ) : null}
-
-                  {selectedShouldShowStructuredReasoning ? (
-                    <div className="space-y-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                        Reasoning summary
-                      </div>
-                      {Object.entries(selectedStructuredReasoningByAgent)
-                        .filter(([, bullets]) => bullets.length > 0)
-                        .sort(([a], [b]) => sortAgentLabels(a, b))
-                        .map(([agentLabel, bullets]) => (
-                          <Card
-                            key={`structured-reasoning-${agentLabel}`}
-                            className="rounded-2xl border-slate-200/80 bg-white py-3 shadow-sm"
-                          >
-                            <CardContent className="px-4">
-                              <div className="flex items-center justify-between gap-2">
-                                <Badge
-                                  variant="outline"
-                                  className="border-slate-200 bg-white text-slate-600"
-                                >
-                                  {agentLabel}
-                                </Badge>
-                              </div>
-                              <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-slate-600">
-                                {bullets.map((bullet, bulletIndex) => (
-                                  <li key={`structured-reasoning-${agentLabel}-${bulletIndex}`}>
-                                    <ReactMarkdown
-                                      remarkPlugins={[remarkGfm]}
-                                      components={{
-                                        p: ({ children }) => <span>{children}</span>,
-                                      }}
-                                    >
-                                      {bullet}
-                                    </ReactMarkdown>
-                                  </li>
-                                ))}
-                              </ul>
-                            </CardContent>
-                          </Card>
-                        ))}
-                    </div>
-                  ) : null}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </aside>
+                    ) : null}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </aside>
+        </div>
       </div>
     </div>
   );
