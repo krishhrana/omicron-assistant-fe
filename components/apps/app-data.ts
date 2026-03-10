@@ -19,17 +19,17 @@ const defaultExamples: AppExample[] = [
   {
     title: "Summarize a thread",
     body: "Pull the key decisions and next steps from the last 10 messages.",
-    surface: "from-sky-100 via-white to-indigo-50",
+    surface: "from-[#f4f4f2] via-white to-[#fafaf8]",
   },
   {
     title: "Draft a response",
     body: "Generate a reply that sounds friendly and confirms the timeline.",
-    surface: "from-amber-100 via-white to-rose-50",
+    surface: "from-[#f2f2f0] via-white to-[#f8f8f6]",
   },
   {
     title: "Find action items",
     body: "List tasks, owners, and due dates mentioned in the conversation.",
-    surface: "from-emerald-100 via-white to-lime-50",
+    surface: "from-[#f5f5f3] via-white to-[#f3f3f1]",
   },
 ];
 
@@ -47,17 +47,17 @@ export const APPS: AppDefinition[] = [
       {
         title: "Summarize a thread",
         body: "Summarize this customer thread and highlight outstanding questions.",
-        surface: "from-rose-100 via-white to-amber-50",
+        surface: "from-[#f4f4f2] via-white to-[#fafaf8]",
       },
       {
         title: "Draft a reply",
-        body: "Write a warm follow-up confirming delivery by Friday.",
-        surface: "from-amber-100 via-white to-orange-50",
+        body: "Write a follow-up confirming delivery by Friday.",
+        surface: "from-[#f2f2f0] via-white to-[#f8f8f6]",
       },
       {
         title: "Prioritize inbox",
         body: "List the top 5 urgent emails from today and explain why.",
-        surface: "from-emerald-100 via-white to-lime-50",
+        surface: "from-[#f5f5f3] via-white to-[#f3f3f1]",
       },
     ],
   },
@@ -74,17 +74,17 @@ export const APPS: AppDefinition[] = [
       {
         title: "Summarize a chat",
         body: "Summarize this chat and capture any follow-ups.",
-        surface: "from-emerald-100 via-white to-green-50",
+        surface: "from-[#f4f4f2] via-white to-[#fafaf8]",
       },
       {
         title: "Draft a response",
         body: "Create a polite reply acknowledging the issue and next steps.",
-        surface: "from-teal-100 via-white to-sky-50",
+        surface: "from-[#f2f2f0] via-white to-[#f8f8f6]",
       },
       {
         title: "Capture intent",
         body: "List buying signals and decision criteria mentioned in this thread.",
-        surface: "from-lime-100 via-white to-emerald-50",
+        surface: "from-[#f5f5f3] via-white to-[#f3f3f1]",
       },
     ],
   },

@@ -1,5 +1,5 @@
-import ChatThread from "@/components/chat/ChatThread";
+import ChatLanding from "@/components/chat/ChatLanding";
 
 export default function ChatPage() {
-  return <ChatThread conversationId="new" />;
+  return <ChatLanding />;
 }
