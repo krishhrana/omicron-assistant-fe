@@ -55,6 +55,17 @@ import {
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/lib/supabaseClient";
+import {
+  buildOAuthStatusPath,
+  clearPendingOAuthTransaction,
+  isPendingOAuthTransactionExpired,
+  parseOAuthStartResponse,
+  parseOAuthStatusResponse,
+  pollOAuthStatusUntilTerminal,
+  readPendingOAuthTransaction,
+  writePendingOAuthTransaction,
+  type OAuthStatus,
+} from "@/lib/api/oauth";
 
 type OnboardingStep = {
   id: number;
@@ -235,6 +246,10 @@ const OAUTH_CONNECTABLE_APPS: Record<
     pendingKey: "omicron.pendingGoogleDriveConnect",
   },
 };
+
+const OAUTH_PENDING_KEYS = Array.from(
+  new Set(Object.values(OAUTH_CONNECTABLE_APPS).map((config) => config.pendingKey))
+);
 
 const buildOnboardingApiUrl = (path: string) => {
   if (!ONBOARDING_API_BASE_URL) {
@@ -417,6 +432,12 @@ const resolveConnectedProviderAppId = (provider: string | null): string | null =
   ) {
     return "drive";
   }
+  return null;
+};
+
+const resolveConnectedAppStorageKey = (appId: string | null): string | null => {
+  if (appId === "gmail") return "omicron.gmail.connected";
+  if (appId === "drive") return "omicron.google-drive.connected";
   return null;
 };
 
@@ -821,11 +842,19 @@ const renderStepSurface = (step: OnboardingStep, actions: StepActions) => {
             </Alert>
           ) : null}
 
-          {actions.apps.oauthStatus === "error" ? (
+          {actions.apps.oauthStatus === "error" ||
+          actions.apps.oauthStatus === "expired" ? (
             <Alert variant="destructive" className="rounded-xl border-rose-200 bg-rose-50">
-              <AlertTitle>OAuth connection failed</AlertTitle>
+              <AlertTitle>
+                {actions.apps.oauthStatus === "expired"
+                  ? "OAuth request expired"
+                  : "OAuth connection failed"}
+              </AlertTitle>
               <AlertDescription>
-                {actions.apps.oauthDetail || "Unable to complete OAuth connection."}
+                {actions.apps.oauthDetail ||
+                  (actions.apps.oauthStatus === "expired"
+                    ? "Start a new connection to continue."
+                    : "Unable to complete OAuth connection.")}
               </AlertDescription>
             </Alert>
           ) : null}
@@ -1222,6 +1251,12 @@ export function OnboardingWizardShell() {
   const [supportedAppsConnectError, setSupportedAppsConnectError] = useState<
     string | null
   >(null);
+  const [oauthStatusFromPoll, setOauthStatusFromPoll] = useState<OAuthStatus | null>(
+    null
+  );
+  const [oauthDetailFromPoll, setOauthDetailFromPoll] = useState<string | null>(null);
+  const [connectedProviderAppIdFromPoll, setConnectedProviderAppIdFromPoll] =
+    useState<string | null>(null);
   const [persistedConnectedProviderAppIds, setPersistedConnectedProviderAppIds] =
     useState<string[]>([]);
   const [connectingSupportedAppId, setConnectingSupportedAppId] = useState<
@@ -1252,6 +1287,7 @@ export function OnboardingWizardShell() {
     "forward" | "backward"
   >("forward");
   const onboardingBootstrapRef = useRef(false);
+  const oauthPollingKeysRef = useRef<Set<string>>(new Set());
 
   const activeStep = useMemo(
     () => clampStep(Number(searchParams.get("step") ?? "1")),
@@ -1269,13 +1305,17 @@ export function OnboardingWizardShell() {
     if ((oauthStatus ?? "").trim().toLowerCase() !== "connected") return null;
     return resolveConnectedProviderAppId(oauthProvider);
   }, [oauthProvider, oauthStatus]);
+  const effectiveConnectedProviderAppId =
+    connectedProviderAppIdFromPoll ?? callbackConnectedProviderAppId;
+  const effectiveOauthStatus = oauthStatusFromPoll ?? oauthStatus;
+  const effectiveOauthDetail = oauthDetailFromPoll ?? oauthDetail;
   const connectedProviderAppIds = useMemo(() => {
     const normalized = new Set<string>(persistedConnectedProviderAppIds);
-    if (callbackConnectedProviderAppId) {
-      normalized.add(callbackConnectedProviderAppId);
+    if (effectiveConnectedProviderAppId) {
+      normalized.add(effectiveConnectedProviderAppId);
     }
     return Array.from(normalized);
-  }, [callbackConnectedProviderAppId, persistedConnectedProviderAppIds]);
+  }, [effectiveConnectedProviderAppId, persistedConnectedProviderAppIds]);
   const browserCredentialSavedCount = savedBrowserCredentials.length;
   const supportedAppsCountForSizing =
     supportedApps.length > 0 ? supportedApps.length : isSupportedAppsLoading ? 4 : 3;
@@ -1865,6 +1905,9 @@ export function OnboardingWizardShell() {
       }
 
       setSupportedAppsConnectError(null);
+      setOauthStatusFromPoll(null);
+      setOauthDetailFromPoll(null);
+      setConnectedProviderAppIdFromPoll(null);
       setConnectingSupportedAppId(app.id);
 
       try {
@@ -1895,30 +1938,42 @@ export function OnboardingWizardShell() {
           throw new Error(await extractErrorMessage(response));
         }
 
-        const redirectTo = (url?: string | null) => {
-          if (!url) return false;
-          localStorage.setItem(connectConfig.pendingKey, "true");
-          window.location.href = url;
-          return true;
-        };
-
-        let dataPayload: Record<string, unknown> | null = null;
-        try {
-          dataPayload = (await response.json()) as Record<string, unknown>;
-        } catch {
-          const text = await response.text();
-          if (redirectTo(text.match(/https?:\/\/[^\s"]+/)?.[0])) return;
+        const responseText = await response.text();
+        let payload: unknown = null;
+        if (responseText.trim()) {
+          try {
+            payload = JSON.parse(responseText) as unknown;
+          } catch {
+            payload = responseText;
+          }
         }
 
-        const redirectUrl =
-          (dataPayload?.authorization_url as string | undefined) ??
-          (dataPayload?.authorizationUrl as string | undefined) ??
-          (dataPayload?.authUrl as string | undefined) ??
-          (dataPayload?.redirectUrl as string | undefined) ??
-          (dataPayload?.url as string | undefined) ??
-          (dataPayload?.location as string | undefined);
+        const parsedStart = parseOAuthStartResponse(payload);
+        const fallbackRedirect =
+          typeof payload === "string"
+            ? payload.match(/https?:\/\/[^\s"]+/)?.[0]
+            : null;
+        const redirectUrl = parsedStart.url ?? fallbackRedirect;
 
-        if (redirectTo(redirectUrl)) return;
+        if (parsedStart.transactionId) {
+          writePendingOAuthTransaction({
+            pendingKey: connectConfig.pendingKey,
+            transactionId: parsedStart.transactionId,
+            statusPath: buildOAuthStatusPath(
+              connectConfig.startPath,
+              parsedStart.transactionId
+            ),
+            provider: parsedStart.provider,
+            expiresAt: parsedStart.expiresAt,
+            createdAt: new Date().toISOString(),
+          });
+        }
+
+        if (redirectUrl) {
+          localStorage.setItem(connectConfig.pendingKey, "true");
+          window.location.href = redirectUrl;
+          return;
+        }
 
         throw new Error(`Unable to start ${app.display_name} connection.`);
       } catch (error) {
@@ -2232,12 +2287,167 @@ export function OnboardingWizardShell() {
   ]);
 
   useEffect(() => {
+    if (activeStep !== 3) return;
+
+    let cancelled = false;
+    const abortController = new AbortController();
+
+    const pollPendingOAuthTransaction = async (
+      pendingKey: string,
+      accessToken: string
+    ) => {
+      if (oauthPollingKeysRef.current.has(pendingKey)) return;
+
+      const pendingTransaction = readPendingOAuthTransaction(pendingKey);
+      if (!pendingTransaction) return;
+
+      if (isPendingOAuthTransactionExpired(pendingTransaction)) {
+        clearPendingOAuthTransaction(pendingKey);
+        localStorage.removeItem(pendingKey);
+        return;
+      }
+
+      oauthPollingKeysRef.current.add(pendingKey);
+
+      try {
+        const terminalStatus = await pollOAuthStatusUntilTerminal({
+          signal: abortController.signal,
+          readStatus: async () => {
+            if (abortController.signal.aborted) return null;
+
+            const response = await fetch(
+              buildOnboardingApiUrl(pendingTransaction.statusPath),
+              {
+                method: "GET",
+                cache: "no-store",
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                },
+              }
+            );
+
+            if (response.status === 404) {
+              return {
+                status: "expired",
+                connected: false,
+                detail: "Connection request expired. Please try again.",
+                provider: pendingTransaction.provider,
+                transactionId: pendingTransaction.transactionId,
+                updatedAt: null,
+              };
+            }
+
+            if (!response.ok) {
+              throw new Error(await extractErrorMessage(response));
+            }
+
+            const payload = await response.json();
+            const parsed = parseOAuthStatusResponse(payload);
+            if (!parsed) {
+              throw new Error("Invalid OAuth status payload.");
+            }
+            return parsed;
+          },
+        });
+
+        if (cancelled || abortController.signal.aborted || !terminalStatus) return;
+
+        clearPendingOAuthTransaction(pendingKey);
+        localStorage.removeItem(pendingKey);
+
+        const connectedProviderAppId = resolveConnectedProviderAppId(
+          terminalStatus.provider ?? pendingTransaction.provider
+        );
+
+        if (terminalStatus.status === "connected") {
+          setOauthStatusFromPoll("connected");
+          setOauthDetailFromPoll(null);
+          setConnectedProviderAppIdFromPoll(connectedProviderAppId);
+
+          if (connectedProviderAppId) {
+            setPersistedConnectedProviderAppIds((previous) => {
+              const next = new Set(previous);
+              next.add(connectedProviderAppId);
+              return Array.from(next);
+            });
+
+            const connectedStorageKey =
+              resolveConnectedAppStorageKey(connectedProviderAppId);
+            if (connectedStorageKey) {
+              localStorage.setItem(connectedStorageKey, "true");
+            }
+          }
+
+          try {
+            const nextState = await fetchOnboardingState(accessToken);
+            if (!cancelled) {
+              hydrateOnboardingState(nextState);
+            }
+          } catch {
+            // Keep onboarding flow usable even if state hydration fails.
+          }
+          return;
+        }
+
+        setOauthStatusFromPoll(terminalStatus.status);
+        setOauthDetailFromPoll(
+          terminalStatus.detail ??
+            (terminalStatus.status === "expired"
+              ? "Connection request expired. Please try again."
+              : "Unable to complete OAuth connection.")
+        );
+      } catch (error) {
+        if (cancelled || abortController.signal.aborted) return;
+        setSupportedAppsConnectError(
+          error instanceof Error
+            ? error.message
+            : "Unable to read OAuth connection status."
+        );
+      } finally {
+        oauthPollingKeysRef.current.delete(pendingKey);
+      }
+    };
+
+    const pollPendingOAuthTransactions = async () => {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase.auth.getSession();
+      if (cancelled || error) return;
+
+      const accessToken = data.session?.access_token;
+      if (!accessToken) return;
+
+      await Promise.all(
+        OAUTH_PENDING_KEYS.map((pendingKey) =>
+          pollPendingOAuthTransaction(pendingKey, accessToken)
+        )
+      );
+    };
+
+    void pollPendingOAuthTransactions();
+
+    return () => {
+      cancelled = true;
+      abortController.abort();
+    };
+  }, [activeStep, fetchOnboardingState, hydrateOnboardingState]);
+
+  useEffect(() => {
     if (activeStep !== 3) {
       setSelectedSupportedApp(null);
+      setOauthStatusFromPoll(null);
+      setOauthDetailFromPoll(null);
+      setConnectedProviderAppIdFromPoll(null);
       return;
     }
     setSupportedAppsConnectError(null);
-  }, [activeStep, oauthProvider, oauthStatus, oauthDetail]);
+  }, [
+    activeStep,
+    oauthProvider,
+    oauthStatus,
+    oauthDetail,
+    effectiveOauthStatus,
+    effectiveOauthDetail,
+  ]);
 
   return (
     <div className="omicron-canvas">
@@ -2426,9 +2636,9 @@ export function OnboardingWizardShell() {
                           connectError: supportedAppsConnectError,
                           connectingAppId: connectingSupportedAppId,
                           connectedProviderAppIds,
-                          connectedProviderAppId: callbackConnectedProviderAppId,
-                          oauthStatus,
-                          oauthDetail,
+                          connectedProviderAppId: effectiveConnectedProviderAppId,
+                          oauthStatus: effectiveOauthStatus,
+                          oauthDetail: effectiveOauthDetail,
                           selectedApp: selectedSupportedApp,
                           browserCredentialDrafts,
                           browserCredentialDraftErrors,

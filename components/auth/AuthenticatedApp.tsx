@@ -87,6 +87,7 @@ export function AuthenticatedApp({
   const [isOnboardingLoading, setIsOnboardingLoading] = useState(true);
   const [onboardingError, setOnboardingError] = useState<string | null>(null);
   const onboardingCheckedSessionKeyRef = useRef<string | null>(null);
+  const whatsappPrewarmSessionKeyRef = useRef<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -256,6 +257,47 @@ export function AuthenticatedApp({
     onboardingCurrentStep,
     onboardingError,
     router,
+  ]);
+
+  useEffect(() => {
+    if (isLoading || error || !session) return;
+    if (!ONBOARDING_API_BASE_URL) return;
+    if (ONBOARDING_ENFORCED) {
+      if (isOnboardingLoading || onboardingError || onboardingComplete !== true) {
+        return;
+      }
+    } else if (onboardingComplete !== true) {
+      return;
+    }
+
+    const sessionKey = resolveOnboardingSessionKey(session);
+    if (whatsappPrewarmSessionKeyRef.current === sessionKey) {
+      return;
+    }
+    whatsappPrewarmSessionKeyRef.current = sessionKey;
+
+    const abortController = new AbortController();
+    void fetch(`${ONBOARDING_API_BASE_URL}/whatsapp/runtime/prewarm`, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      signal: abortController.signal,
+    }).catch(() => {
+      // Prewarm is a non-blocking optimization.
+    });
+
+    return () => {
+      abortController.abort();
+    };
+  }, [
+    session,
+    isLoading,
+    error,
+    onboardingComplete,
+    isOnboardingLoading,
+    onboardingError,
   ]);
 
   const value = useMemo(

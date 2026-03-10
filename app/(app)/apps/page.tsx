@@ -22,6 +22,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  buildOAuthStatusPath,
+  clearPendingOAuthTransaction,
+  isPendingOAuthTransactionExpired,
+  parseOAuthStartResponse,
+  parseOAuthStatusResponse,
+  pollOAuthStatusUntilTerminal,
+  readPendingOAuthTransaction,
+  writePendingOAuthTransaction,
+} from "@/lib/api/oauth";
 
 const APPS_API_BASE_URL = (process.env.NEXT_PUBLIC_CHAT_API_URL ?? "").replace(
   /\/$/,
@@ -79,6 +89,14 @@ const CONNECTABLE_APPS: Record<string, ConnectConfig> = {
   },
 };
 
+const OAUTH_PENDING_KEYS = Array.from(
+  new Set(
+    Object.values(CONNECTABLE_APPS)
+      .filter((config): config is OAuthConnectConfig => config.kind === "oauth")
+      .map((config) => config.pendingKey)
+  )
+);
+
 const DISCONNECTABLE_APPS: Record<string, string> = {
   gmail: "/oauth/gmail/disconnect",
   drive: "/oauth/google-drive/disconnect",
@@ -131,6 +149,7 @@ type WhatsAppConnectStatus = {
   status: string;
   connected: boolean;
   reauthRequired: boolean;
+  disconnectReason: string | null;
   message: string | null;
   qrCode: string | null;
   qrImageDataUrl: string | null;
@@ -287,6 +306,11 @@ const parseWhatsAppConnectStatus = (
     status: rawStatus.trim().toLowerCase(),
     connected: Boolean(payload.connected),
     reauthRequired: Boolean(payload.reauth_required),
+    disconnectReason:
+      typeof payload.disconnect_reason === "string" &&
+      payload.disconnect_reason.trim()
+        ? payload.disconnect_reason.trim().toLowerCase()
+        : null,
     message:
       typeof payload.message === "string" && payload.message.trim()
         ? payload.message
@@ -400,6 +424,20 @@ const resolveBrowserSiteName = (websiteUrl: string): string => {
   }
 };
 
+const resolveConnectedAppStorageKey = (provider: string | null): string | null => {
+  if (!provider) return null;
+  const normalized = provider.trim().toLowerCase();
+  if (normalized === "gmail") return "omicron.gmail.connected";
+  if (
+    normalized === "google-drive" ||
+    normalized === "drive" ||
+    normalized === "google_drive"
+  ) {
+    return "omicron.google-drive.connected";
+  }
+  return null;
+};
+
 export default function AppsPage() {
   const { session, isLoading: isAuthLoading } = useAuth();
   const accessToken = session?.access_token ?? null;
@@ -423,6 +461,7 @@ export default function AppsPage() {
   const [isWhatsAppStatusLoading, setIsWhatsAppStatusLoading] = useState(false);
   const [isWhatsAppStatusPolling, setIsWhatsAppStatusPolling] = useState(false);
   const whatsAppStatusRequestSeqRef = useRef(0);
+  const oauthPollingKeysRef = useRef<Set<string>>(new Set());
   const [whatsAppCountdownNowMs, setWhatsAppCountdownNowMs] = useState(() =>
     Date.now()
   );
@@ -536,7 +575,18 @@ export default function AppsPage() {
       case "awaiting_qr":
         return "Almost there. Scan the QR code in WhatsApp to finish linking.";
       case "logged_out":
+        if (whatsAppStatus?.disconnectReason === "user_disconnected") {
+          return "You disconnected WhatsApp. Tap Connect to relink.";
+        }
         return "Your WhatsApp session has ended. Tap Connect to sign in again.";
+      case "disconnected":
+        if (whatsAppStatus?.disconnectReason === "runtime_expired") {
+          return "Your WhatsApp runtime expired. Tap Connect to resume.";
+        }
+        if (whatsAppStatus?.disconnectReason === "user_disconnected") {
+          return "You disconnected WhatsApp. Tap Connect to relink.";
+        }
+        return "Ready when you are. Tap Connect to link your WhatsApp.";
       case "error":
         return "We couldn't connect right now. Tap Connect to try again.";
       case "connecting":
@@ -701,6 +751,112 @@ export default function AppsPage() {
   useEffect(() => {
     void loadAppsData();
   }, [loadAppsData]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+
+    const abortController = new AbortController();
+
+    const pollPendingOAuthTransaction = async (pendingKey: string) => {
+      if (oauthPollingKeysRef.current.has(pendingKey)) return;
+
+      const pendingTransaction = readPendingOAuthTransaction(pendingKey);
+      if (!pendingTransaction) return;
+
+      if (isPendingOAuthTransactionExpired(pendingTransaction)) {
+        clearPendingOAuthTransaction(pendingKey);
+        localStorage.removeItem(pendingKey);
+        return;
+      }
+
+      oauthPollingKeysRef.current.add(pendingKey);
+
+      try {
+        const terminalStatus = await pollOAuthStatusUntilTerminal({
+          signal: abortController.signal,
+          readStatus: async () => {
+            if (abortController.signal.aborted) return null;
+
+            const response = await fetch(
+              buildAppsApiUrl(pendingTransaction.statusPath),
+              {
+                method: "GET",
+                cache: "no-store",
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                },
+              }
+            );
+
+            if (response.status === 404) {
+              return {
+                status: "expired",
+                connected: false,
+                detail: "Connection request expired. Please try again.",
+                provider: pendingTransaction.provider,
+                transactionId: pendingTransaction.transactionId,
+                updatedAt: null,
+              };
+            }
+
+            if (!response.ok) {
+              throw new Error(await extractErrorMessage(response));
+            }
+
+            const payload = await response.json();
+            const parsed = parseOAuthStatusResponse(payload);
+            if (!parsed) {
+              throw new Error("Invalid OAuth status payload.");
+            }
+            return parsed;
+          },
+        });
+
+        if (abortController.signal.aborted || !terminalStatus) return;
+
+        clearPendingOAuthTransaction(pendingKey);
+        localStorage.removeItem(pendingKey);
+
+        const provider = terminalStatus.provider ?? pendingTransaction.provider;
+        const connectedStorageKey = resolveConnectedAppStorageKey(provider);
+
+        if (terminalStatus.status === "connected") {
+          if (connectedStorageKey) {
+            localStorage.setItem(connectedStorageKey, "true");
+          }
+          setConnectError(null);
+          await loadAppsData();
+          return;
+        }
+
+        if (terminalStatus.status === "error" || terminalStatus.status === "expired") {
+          setConnectError(
+            terminalStatus.detail ??
+              (terminalStatus.status === "expired"
+                ? "Connection request expired. Please try again."
+                : "Unable to complete OAuth connection.")
+          );
+        }
+      } catch (error) {
+        if (abortController.signal.aborted) return;
+        setConnectError(
+          error instanceof Error
+            ? error.message
+            : "Unable to read OAuth connection status."
+        );
+      } finally {
+        oauthPollingKeysRef.current.delete(pendingKey);
+      }
+    };
+
+    for (const pendingKey of OAUTH_PENDING_KEYS) {
+      void pollPendingOAuthTransaction(pendingKey);
+    }
+
+    return () => {
+      abortController.abort();
+    };
+  }, [accessToken, loadAppsData]);
 
   const loadWhatsAppStatus = useCallback(
     async (startPath: string = "/whatsapp/connect/status") => {
@@ -942,28 +1098,46 @@ export default function AppsPage() {
         credentials: "include",
       });
 
+      if (!response.ok) {
+        throw new Error(await extractErrorMessage(response));
+      }
+
+      const responseText = await response.text();
+      let payload: unknown = null;
+      if (responseText.trim()) {
+        try {
+          payload = JSON.parse(responseText) as unknown;
+        } catch {
+          payload = responseText;
+        }
+      }
+
       const redirectTo = (url?: string | null) => {
         if (!url) return false;
-        localStorage.setItem(connectConfig.pendingKey, "true");
         window.location.href = url;
         return true;
       };
 
-      let data: Record<string, unknown> | null = null;
-      try {
-        data = (await response.json()) as Record<string, unknown>;
-      } catch {
-        const text = await response.text();
-        if (redirectTo(text.match(/https?:\/\/[^\s"]+/)?.[0])) return;
+      const parsedStart = parseOAuthStartResponse(payload);
+      const fallbackRedirect =
+        typeof payload === "string" ? payload.match(/https?:\/\/[^\s"]+/)?.[0] : null;
+      const redirectUrl = parsedStart.url ?? fallbackRedirect;
+
+      if (parsedStart.transactionId) {
+        writePendingOAuthTransaction({
+          pendingKey: connectConfig.pendingKey,
+          transactionId: parsedStart.transactionId,
+          statusPath: buildOAuthStatusPath(
+            connectConfig.startPath,
+            parsedStart.transactionId
+          ),
+          provider: parsedStart.provider,
+          expiresAt: parsedStart.expiresAt,
+          createdAt: new Date().toISOString(),
+        });
       }
 
-      const redirectUrl =
-        (data?.authorization_url as string | undefined) ??
-        (data?.authorizationUrl as string | undefined) ??
-        (data?.authUrl as string | undefined) ??
-        (data?.redirectUrl as string | undefined) ??
-        (data?.url as string | undefined) ??
-        (data?.location as string | undefined);
+      localStorage.setItem(connectConfig.pendingKey, "true");
 
       if (redirectTo(redirectUrl)) return;
       throw new Error(`Unable to start ${selectedApp.name} connection.`);

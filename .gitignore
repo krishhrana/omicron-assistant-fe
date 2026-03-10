@@ -1,29 +1,46 @@
-# Dependencies
-/node_modules
-/.pnp
+# -----------------------------------------------------------------------------
+# Dependencies / Package managers
+# -----------------------------------------------------------------------------
+node_modules/
+.pnp
 .pnp.*
+.npm/
+.pnpm-store/
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-.npm/
-.pnpm-store/
 
-# Build and framework output
-/.next
-/out
-/build
-/dist
-/.turbo
-/.cache
-/.parcel-cache
+# -----------------------------------------------------------------------------
+# Framework + build output (Next.js / general frontend)
+# -----------------------------------------------------------------------------
+.next/
+out/
+build/
+dist/
+.turbo/
+.parcel-cache/
+.cache/
+.swc/
 
-# Test and coverage output
-/coverage
-/.nyc_output
+# -----------------------------------------------------------------------------
+# TypeScript / bundler metadata
+# -----------------------------------------------------------------------------
+*.tsbuildinfo
+next-env.d.ts
 
-# Runtime and debug logs
+# -----------------------------------------------------------------------------
+# Test, coverage, and reports
+# -----------------------------------------------------------------------------
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# -----------------------------------------------------------------------------
+# Logs / runtime diagnostics
+# -----------------------------------------------------------------------------
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -33,36 +50,30 @@ lerna-debug.log*
 *.pid
 *.seed
 
-# Environment files
-.env*
+# -----------------------------------------------------------------------------
+# Environment and secrets
+# Keep examples tracked, ignore all local env files
+# -----------------------------------------------------------------------------
+.env
+.env.*
 !.env.example
 !.env.*.example
 
-# Deployment and platform
-.vercel
+# -----------------------------------------------------------------------------
+# Deployment / hosting
+# -----------------------------------------------------------------------------
+.vercel/
 
-# TypeScript and generated metadata
-*.tsbuildinfo
-next-env.d.ts
-
-# Tooling caches
+# -----------------------------------------------------------------------------
+# Tool caches
+# -----------------------------------------------------------------------------
 .eslintcache
 .stylelintcache
 .prettier-cache
 
-# Python / virtual env (for local backend scripts)
-.venv/
-venv/
-ENV/
-__pycache__/
-*.py[cod]
-
-# Certificates and local secrets
-*.pem
-*.key
-*.crt
-
-# Editor / IDE
+# -----------------------------------------------------------------------------
+# IDE / editor files
+# -----------------------------------------------------------------------------
 .idea/
 .vscode/*
 !.vscode/extensions.json
@@ -70,18 +81,35 @@ __pycache__/
 !.vscode/tasks.json
 !.vscode/launch.json
 
-# OS-generated files
+# -----------------------------------------------------------------------------
+# OS junk
+# -----------------------------------------------------------------------------
 .DS_Store
 Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
-# Temporary files
+# -----------------------------------------------------------------------------
+# Temporary / backup files
+# -----------------------------------------------------------------------------
 tmp/
 temp/
 *.tmp
-todos/
 *.orig
 
-# Legacy hooks
+# -----------------------------------------------------------------------------
+# Optional local workspace scratch area
+# -----------------------------------------------------------------------------
+todos/
+
+# -----------------------------------------------------------------------------
+# Local certificates / keys
+# -----------------------------------------------------------------------------
+*.pem
+*.key
+*.crt
+
+# -----------------------------------------------------------------------------
+# Legacy hooks path
+# -----------------------------------------------------------------------------
 .githooks/

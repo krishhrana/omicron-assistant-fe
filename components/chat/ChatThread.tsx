@@ -122,6 +122,7 @@ export default function ChatThread({
   const [isStreaming, setIsStreaming] = useState(false);
   const [newChatDraft, setNewChatDraft] = useState("");
   const [showHeaderSeparator, setShowHeaderSeparator] = useState(false);
+  const [composerInsetBottom, setComposerInsetBottom] = useState(168);
   const [thinkingTimelineByMessageId, setThinkingTimelineByMessageId] = useState<
     Record<string, ThinkingTimelineEntry[]>
   >({});
@@ -129,7 +130,9 @@ export default function ChatThread({
   const streamControllerRef = useRef<AbortController | null>(null);
   const hasAutoStartedRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const composerContainerRef = useRef<HTMLDivElement | null>(null);
   const isProgrammaticScrollRef = useRef(false);
+  const previousMessageCountRef = useRef(0);
   const conversationsRef = useRef<ChatConversation[]>(conversations);
   const messagesRef = useRef<ChatMessage[]>(messages);
   const conversationRef = useRef<ChatConversation | null>(conversation);
@@ -155,6 +158,38 @@ export default function ChatThread({
   useEffect(() => {
     thinkingTimelineRef.current = thinkingTimelineByMessageId;
   }, [thinkingTimelineByMessageId]);
+
+  useEffect(() => {
+    const composerContainer = composerContainerRef.current;
+    if (!composerContainer) return;
+
+    const updateInset = () => {
+      const nextInset =
+        Math.ceil(composerContainer.getBoundingClientRect().height) + 20;
+      setComposerInsetBottom((previous) =>
+        Math.abs(previous - nextInset) < 1 ? previous : nextInset
+      );
+    };
+
+    updateInset();
+
+    if (typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      updateInset();
+    });
+
+    observer.observe(composerContainer);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  const lastMessageContentLength = useMemo(() => {
+    const lastMessage = messages[messages.length - 1];
+    return lastMessage?.content.length ?? 0;
+  }, [messages]);
 
   const selectedReasoningMessage = useMemo(
     () => messages.find((message) => message.id === selectedReasoningId) ?? null,
@@ -438,21 +473,30 @@ export default function ChatThread({
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    const messageCountIncreased = messages.length > previousMessageCountRef.current;
+    previousMessageCountRef.current = messages.length;
+
+    if (!messageCountIncreased) {
+      const distanceToBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      if (distanceToBottom > 120) return;
+    }
+
     isProgrammaticScrollRef.current = true;
     container.scrollTo({
       top: container.scrollHeight,
-      behavior: "smooth",
+      behavior: messageCountIncreased ? "smooth" : "auto",
     });
 
     const timeoutId = window.setTimeout(() => {
       isProgrammaticScrollRef.current = false;
-    }, 350);
+    }, messageCountIncreased ? 350 : 120);
 
     return () => {
       window.clearTimeout(timeoutId);
       isProgrammaticScrollRef.current = false;
     };
-  }, [messages.length]);
+  }, [messages.length, lastMessageContentLength, composerInsetBottom]);
 
   useEffect(() => {
     setShowHeaderSeparator(false);
@@ -937,7 +981,10 @@ export default function ChatThread({
               onScroll={handleThreadScroll}
               className="h-full overflow-y-auto"
             >
-              <div className="mx-auto w-full max-w-[44rem] space-y-6 pb-24 pt-2">
+              <div
+                className="mx-auto w-full max-w-[44rem] space-y-6 pt-2"
+                style={{ paddingBottom: `${composerInsetBottom}px` }}
+              >
                 {sendError ? (
                   <Alert variant="destructive">
                     <AlertDescription>{sendError}</AlertDescription>
@@ -957,7 +1004,10 @@ export default function ChatThread({
             </div>
 
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-[#f6f6f3]">
-              <div className="pointer-events-auto mx-auto w-full max-w-[44rem] pb-3">
+              <div
+                ref={composerContainerRef}
+                className="pointer-events-auto mx-auto w-full max-w-[44rem] pb-3"
+              >
                 <ChatComposer
                   onSend={startStreaming}
                   isSending={isStreaming}

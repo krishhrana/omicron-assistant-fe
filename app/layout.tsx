@@ -2,26 +2,16 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
-const openAISans = localFont({
+const inter = localFont({
   src: [
     {
-      path: "../fonts/OpenAISans-Regular.woff2",
-      weight: "400",
+      path: "../fonts/Inter/Inter-VariableFont_opsz,wght.ttf",
+      weight: "100 900",
       style: "normal",
     },
     {
-      path: "../fonts/OpenAISans-Medium.woff2",
-      weight: "500",
-      style: "normal",
-    },
-    {
-      path: "../fonts/OpenAISans-Semibold.woff2",
-      weight: "600",
-      style: "normal",
-    },
-    {
-      path: "../fonts/OpenAISans-RegularItalic.woff2",
-      weight: "400",
+      path: "../fonts/Inter/Inter-Italic-VariableFont_opsz,wght.ttf",
+      weight: "100 900",
       style: "italic",
     },
   ],
@@ -29,17 +19,17 @@ const openAISans = localFont({
   display: "swap",
 });
 
-const openAISansDisplay = localFont({
+const interDisplay = localFont({
   src: [
     {
-      path: "../fonts/OpenAISans-Semibold.woff2",
-      weight: "600",
+      path: "../fonts/Inter/Inter-VariableFont_opsz,wght.ttf",
+      weight: "100 900",
       style: "normal",
     },
     {
-      path: "../fonts/OpenAISans-Medium.woff2",
-      weight: "500",
-      style: "normal",
+      path: "../fonts/Inter/Inter-Italic-VariableFont_opsz,wght.ttf",
+      weight: "100 900",
+      style: "italic",
     },
   ],
   variable: "--font-display",
@@ -58,7 +48,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${openAISans.className} ${openAISans.variable} ${openAISansDisplay.variable} antialiased`}>
+      <body className={`${inter.className} ${inter.variable} ${interDisplay.variable} antialiased`}>
         {children}
       </body>
     </html>
